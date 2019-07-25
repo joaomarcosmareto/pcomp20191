@@ -62,6 +62,7 @@ def build_dificuldade_1(input_file, input_encoding):
 
     lista           = []
     lista_negativos = []
+    lista_total     = []
     labels          = []
 
     with open(input_file, encoding=input_encoding) as json_file:
@@ -82,6 +83,7 @@ def build_dificuldade_1(input_file, input_encoding):
 
     lista = organiza(lista)
     lista_negativos = build_negativos_dificuldade_1(lista)
+    lista_total = lista + lista_negativos
 
     for registro in lista_total:
         if type(registro['_id']) == str:
@@ -89,4 +91,4 @@ def build_dificuldade_1(input_file, input_encoding):
         else:
             labels.append(1)
 
-    return lista + lista_negativos, labels
+    return lista_total, labels
