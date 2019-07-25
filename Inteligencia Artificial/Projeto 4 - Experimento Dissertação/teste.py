@@ -1,93 +1,79 @@
 # -*- coding: utf-8 -*-
-import sys, os
-import json
 import metricas
 import organiza_datasets
-from sklearn.feature_extraction.text import TfidfVectorizer
+import numpy
 
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 
 from sklearn.model_selection import cross_val_score
 from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.model_selection import RandomizedSearchCV
 
-lista            = []
-lista_negativos  = []
-lista_total      = []
-labels           = []
+input_file = 'teste.json'
+input_encoding = 'utf8'
 
-with open(os.path.join(sys.argv[0], 'teste.json'), encoding="utf8") as json_file:
-    data = json_file.readlines()
+dataset         = []
+labels          = []
+caracteristicas = []
 
-    valido = True
+# cria o dataset, lendo o json (input_file), removendo os registros com dados nulos ou string vazia;
+# cria instancias negativas e concatena num dataset único;
+# cria o array de rótulos na mesma ordem que as instancias pareadas e negativas.
+dataset, labels = organiza_datasets.build_dificuldade_1(input_file, input_encoding)
 
-    for i, item in enumerate(data):
-        data[i] = json.loads(item)
+# extrai o conjunto de características a partir do dataset
+# as características são:
+#   Exact Match;
+#   Longest Commom Substring;
+#   Longest Commom Subsequence;
+#   Levenshtein Distance;
+#   Jaccard Similarity e;
+#   Cosine Similarity with TF-IDF Weights.
+caracteristicas = metricas.extrair_caracteristicas(dataset)
 
-    for registro in data:
-        valido = True
-        for atributos in registro.items():
-            if atributos[1] is None or atributos[1] == '':
-                valido = False
-        if valido:
-            lista.append(registro)
-
-lista = organiza_datasets.organiza(lista)
-lista_negativos = organiza_datasets.build_negativos_dificuldade_1(lista)
-
-lista_total = lista + lista_negativos
-
-for registro in lista_total:
-    if type(registro['_id']) == str:
-        labels.append(0)
-    else:
-        labels.append(1)
-
-
-# =============================================================================
-# O for abaixo gera a lista de dicionarios contendo as caracteristicas
-# de cada registro.
-#
-# no google, username é o G_Displayname;
-# no twitter, username é o T_ScreenName;
-#
-# no google, fullname é o "G_Firstname"+" "+"G_Lastname";
-# no twitter, fullname é o T_Fullname;
-# =============================================================================
-
-tfidf_vectorizer = TfidfVectorizer()
-caracteristicas  = []
-
-for registro in lista_total:
-
-    g_fullname = registro['g_plus']['G_Firstname'] + " " + registro['g_plus']['G_Lastname']
-
-    vec_username    = [registro['g_plus']['G_Displayname'], registro['twitter']['T_ScreenName']]
-    vec_fullname    = [g_fullname, registro['twitter']['T_Fullname']]
-    vec_location    = [registro['g_plus']['G_Location'], registro['twitter']['T_Location']]
-    vec_description = [tfidf_vectorizer, registro['g_plus']['G_aboutme'], registro['twitter']['T_Description']]
-
-    aux = metricas.get_dict_metricas(
-        vec_username,
-        vec_fullname,
-        vec_location,
-        vec_description
-    )
-
-    caracteristicas.append(aux)
-
-print(len(caracteristicas))
-
-
-model = RandomForestClassifier()
-
-# separa o conjunto em 70% para treino e 30% para teste
+# separa o conjunto de características em 70% para treino e 30% para teste
+#X_train,     X_test,      y_train,           y_test =           train_test_split(X,               y,)
 treino_dados, teste_dados, treino_resultados, teste_resultados = train_test_split(caracteristicas, labels, test_size=0.30)
 
-model.fit (treino_dados, treino_resultados)
-pred = model.predict (teste_dados)
+# BEGIN - TRECHO TESTADO EM UM COMPUTADOR COM 16 CORES, E 8 GIGAS DE RAM
+# Testa para descobrir o melhor conjunto de hiper-parâmetros para o classificador
+# número de árvores na floresta aleatória
+n_estimators = [int(x) for x in numpy.linspace(start = 200, stop = 2000, num = 10)]
+# número de características em cada split
+max_features = ['auto', 'sqrt']
 
-rfc_cv_score = cross_val_score(model, caracteristicas, labels, cv=10, scoring='roc_auc')
+# profundidade máxima
+max_depth = [int(x) for x in numpy.linspace(100, 500, num = 11)]
+max_depth.append(None)
+# create random grid
+random_grid = {
+    'n_estimators' : n_estimators,
+    'max_features' : max_features,
+    'max_depth'    : max_depth
+}
+# Random search of parameters
+modelo = RandomForestClassifier()
+rfc_random = RandomizedSearchCV(estimator = modelo, param_distributions = random_grid, n_iter = 100, cv = 3, verbose=2, random_state=42, n_jobs = -1)
+# Fit the model
+rfc_random.fit(treino_dados, treino_resultados)
+# END - TRECHO TESTADO EM UM COMPUTADOR COM 16 CORES, E 8 GIGAS DE RAM
+
+# Constrói o classificador com os dados do teste de tunning de hiper-parâmetros
+modelo = RandomForestClassifier(
+        n_estimators = rfc_random.best_params_['n_estimators'],
+        max_depth    = rfc_random.best_params_['max_depth'],
+        max_features = rfc_random.best_params_['max_features'],
+)
+
+# Preenche o modelo com dados e labels de treino
+modelo.fit(treino_dados, treino_resultados)
+
+# Usa o conjunto de dados de teste para tentar prever os resultados
+pred = modelo.predict(teste_dados)
+
+# Resultado de Cross Validation
+cv_score = cross_val_score(modelo, caracteristicas, labels, cv=10, scoring='roc_auc')
 
 print("=== Confusion Matrix ===")
 print(confusion_matrix(teste_resultados, pred))
@@ -96,7 +82,7 @@ print("=== Classification Report ===")
 print(classification_report(teste_resultados, pred))
 print('\n')
 print("=== All AUC Scores ===")
-print(rfc_cv_score)
+print(cv_score)
 print('\n')
 print("=== Mean AUC Score ===")
-print("Mean AUC Score - Random Forest: ", rfc_cv_score.mean())
+print("Mean AUC Score - Random Forest: ", cv_score.mean())

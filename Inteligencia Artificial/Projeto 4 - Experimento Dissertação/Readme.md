@@ -26,6 +26,13 @@ O campo localização existe no dataset com o mesmo nome tanto no twitter como n
 
 Após esta etapa, a lista de dados contendo as características são separados em dois conjuntos, sendo um para treino e outro para testes. O conjunto de treino é utilizado para treinar um classificador do tipo Floresta Aleatória. O modelo então é utilizado para predizer os dados contidos no conjunto de testes.
 
+O resultado é então apresentado sob a forma de matriz de confusão e relatório de classificação.
+
+A matriz de confusão C é uma matriz onde C<sub>i,j</sub> é igual ao número de observações conhecidas por pertencerem ao grupo <em>i</em>, mas predizidas como pertencerem no grupo <em>j</em>.
+
+Portanto, em classificação binária, a contagem de verdadeiros negativos são C<sub>0,0</sub>, falsos negativos são C<sub>1,0</sub>, verdadeiros positivos são C<sub>1,1</sub> e falsos positivos são C<sub>0,1</sub>.
+
+Já o relatório de classificação retorna um dicionário contendo os valores para as medidas <em>precision, recall, f1-score e support</em>
 
 **O programa desenvolvido é:**
 * teste.py

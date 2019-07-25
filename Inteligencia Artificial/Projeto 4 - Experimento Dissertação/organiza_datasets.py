@@ -1,4 +1,5 @@
 # -*- coding: utf-8 -*-
+import json
 def organiza(lista):
 
     temp_dict = {}
@@ -56,3 +57,36 @@ def build_negativos_dificuldade_1(lista):
         aux_lista.append(temp_dict)
 
     return aux_lista
+
+def build_dificuldade_1(input_file, input_encoding):
+
+    lista           = []
+    lista_negativos = []
+    labels          = []
+
+    with open(input_file, encoding=input_encoding) as json_file:
+        data = json_file.readlines()
+
+        valido = True
+
+        for i, item in enumerate(data):
+            data[i] = json.loads(item)
+
+        for registro in data:
+            valido = True
+            for atributos in registro.items():
+                if atributos[1] is None or atributos[1] == '':
+                    valido = False
+            if valido:
+                lista.append(registro)
+
+    lista = organiza(lista)
+    lista_negativos = build_negativos_dificuldade_1(lista)
+
+    for registro in lista_total:
+        if type(registro['_id']) == str:
+            labels.append(0)
+        else:
+            labels.append(1)
+
+    return lista + lista_negativos, labels

@@ -3,6 +3,7 @@ import nltk
 
 from difflib import SequenceMatcher
 from sklearn.metrics.pairwise import cosine_similarity
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 def exactMatch(str1, str2):
     str1 = str1.lower()
@@ -132,26 +133,6 @@ def get_dict_metricas(vec_username, vec_fullname, vec_location, vec_description)
     vec_location_features    = get_metricas_location(vec_location[0], vec_location[1])
     vec_description_features = get_metricas_description(vec_description[0], vec_description[1], vec_description[2])
 
-# =============================================================================
-#     return {
-#             'username_em'    : vec_username_features[0],
-#             'username_lcs'   : vec_username_features[1],
-#             'username_lcss'  : vec_username_features[2],
-#             'username_ld'    : vec_username_features[3],
-#             'username_js'    : vec_username_features[4],
-#             'fullname_em'    : vec_fullname_features[0],
-#             'fullname_lcs'   : vec_fullname_features[1],
-#             'fullname_lcss'  : vec_fullname_features[2],
-#             'fullname_ld'    : vec_fullname_features[3],
-#             'fullname_js'    : vec_fullname_features[4],
-#             'location_em'    : vec_location_features[0],
-#             'location_lcs'   : vec_location_features[1],
-#             'location_js'    : vec_location_features[2],
-#             'description_cs' : vec_description_features[0],
-# #               no GT nao tem sexo, somente no GF
-# #               'gender_em': None
-#     }
-# =============================================================================
     return [
         vec_username_features[0],
         vec_username_features[1],
@@ -166,7 +147,40 @@ def get_dict_metricas(vec_username, vec_fullname, vec_location, vec_description)
         vec_location_features[0],
         vec_location_features[1],
         vec_location_features[2],
-        vec_description_features[0],
-#       no GT nao tem sexo, somente no GF
-#       'gender_em': None
+        vec_description_features[0]
     ]
+
+def extrair_caracteristicas(dataset):
+    # =============================================================================
+    # O for abaixo gera a lista de dicionarios contendo as caracteristicas
+    # de cada registro.
+    #
+    # no google, username é o G_Displayname;
+    # no twitter, username é o T_ScreenName;
+    #
+    # no google, fullname é o "G_Firstname"+" "+"G_Lastname";
+    # no twitter, fullname é o T_Fullname;
+    # =============================================================================
+
+    tfidf_vectorizer = TfidfVectorizer()
+    caracteristicas  = []
+
+    for registro in dataset:
+
+        g_fullname = registro['g_plus']['G_Firstname'] + " " + registro['g_plus']['G_Lastname']
+
+        vec_username    = [registro['g_plus']['G_Displayname'], registro['twitter']['T_ScreenName']]
+        vec_fullname    = [g_fullname, registro['twitter']['T_Fullname']]
+        vec_location    = [registro['g_plus']['G_Location'], registro['twitter']['T_Location']]
+        vec_description = [tfidf_vectorizer, registro['g_plus']['G_aboutme'], registro['twitter']['T_Description']]
+
+        aux = get_dict_metricas(
+            vec_username,
+            vec_fullname,
+            vec_location,
+            vec_description
+        )
+
+        caracteristicas.append(aux)
+
+    return caracteristicas
